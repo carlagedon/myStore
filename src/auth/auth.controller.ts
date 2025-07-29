@@ -1,41 +1,51 @@
+import { ConfigService } from '@nestjs/config';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Res } from '@nestjs/common';
 import { User } from '@prisma/client';
-import { ValidateDto } from './dto/validate.dto';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { LoginResponse } from './dto/login.response';
+import { Public } from './public.decorator';
+import { Response } from 'express';
+import { getTokenExpirationDateForCookie } from 'src/utils/tokenExpirationDateForCookie';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
-  // Этот метод используется для валидации пользователя по email и паролю.
-  // И он закомментирован, так как это являлось проверкой на работоспособность.
-
-  // @Post('validate')
-  // async validateUser(
-  //   @Body() validateDto: ValidateDto,
-  // ): Promise<Omit<User, 'password'>> {
-  //   return await this.authService.validateUser(
-  //     validateDto.email,
-  //     validateDto.password,
-  //   );
-  // }
-
-  // Это просто яяляется проверкой на работоспособность JWT
-  // В реальном приложении этот метод не нужен, так как токен будет генерироваться
-  // при логине пользователя и храниться на клиенте, а не генерироваться
-  // по запросу от клиента.
-
-  // @Post('generate-access-token')
-  // async generateAccessToken(
-  //   @Body() payload: { sub: string; userRole: string },
-  // ) {
-  //   return await this.authService.generateAccessToken(payload);
-  // }
-
+  @Public()
   @Post('login')
-  async login(@Body() dto: LoginDto) {
-    return await this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    // return await this.authService.login(dto);
+
+    const { accessToken, refreshToken } = await this.authService.login(dto);
+
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      maxAge: getTokenExpirationDateForCookie(
+        this.configService.getOrThrow<string>('JWT_ACCESS_EXPIRATION_TIME'),
+      ),
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+    };
+  }
+
+  @Public()
+  @Post('refresh-token')
+  async refreshToken(
+    @Body() { refreshToken }: RefreshTokenDto,
+  ): Promise<LoginResponse> {
+    return this.authService.refreshToken(refreshToken);
   }
 }

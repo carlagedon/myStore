@@ -3,15 +3,19 @@ import { JwtService } from '@nestjs/jwt';
 import { User } from '@prisma/client';
 import { compare } from 'bcrypt';
 import { PrismaService } from 'src/config/db/prisma.service';
-import {
-  ACCESS_JWT_SERVICE,
-  REFRESH_JWT_SERVICE,
-} from 'src/config/jwt.provide';
+
 import { UserService } from 'src/user/user.service';
 import { LoginDto } from './dto/login.dto';
 import { v4 as uuidV4 } from 'uuid';
 
 import { getTokenExpirationDate } from 'src/utils/getTokenExpirationDate';
+import { LoginResponse } from './dto/login.response';
+import { RefreshTokenPayload } from 'src/types/refresh-token-payload';
+import { InvalidRefreshTokenException } from 'src/types/exceptions/invalid-refresh-token.exception';
+import {
+  ACCESS_JWT_SERVICE,
+  REFRESH_JWT_SERVICE,
+} from 'src/config/jwt.provider.factory';
 
 @Injectable()
 export class AuthService {
@@ -22,7 +26,7 @@ export class AuthService {
     @Inject(REFRESH_JWT_SERVICE) private readonly jwtRefresh: JwtService,
   ) {}
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto): Promise<LoginResponse> {
     const user = await this.validateUser(dto.email, dto.password);
 
     const payload = { sub: user.id, userRole: user.role };
@@ -35,6 +39,81 @@ export class AuthService {
       accessToken,
       refreshToken,
     };
+  }
+
+  async refreshToken(refreshToken: string): Promise<LoginResponse> {
+    const refreshTokenContent: RefreshTokenPayload =
+      await this.jwtRefresh.verifyAsync(refreshToken);
+
+    await this.validateRefreshToken(refreshToken, refreshTokenContent);
+
+    const userRole = await this.getUserRole(refreshTokenContent.sub);
+
+    const accessToken = await this.generateAccessToken({
+      sub: refreshTokenContent.sub,
+      userRole,
+    });
+
+    const newRefreshToken = await this.rotateRefreshToken(
+      refreshToken,
+      refreshTokenContent,
+    );
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+    };
+  }
+
+  private async rotateRefreshToken(
+    refreshToken: string,
+    refreshTokenContent: RefreshTokenPayload,
+  ): Promise<string> {
+    await this.prismaService.userTokens.deleteMany({ where: { refreshToken } });
+
+    const newRefreshToken = await this.generateRefreshToken({
+      sub: refreshTokenContent.sub,
+      tokenFamily: refreshTokenContent.tokenFamily,
+    });
+
+    return newRefreshToken;
+  }
+
+  private async validateRefreshToken(
+    refreshToken: string,
+    refreshTokenContent: RefreshTokenPayload,
+  ): Promise<boolean> {
+    const userTokens = await this.prismaService.userTokens.findMany({
+      where: { userId: refreshTokenContent.sub, refreshToken },
+    });
+
+    const isRefreshTokenValid = userTokens.length > 0;
+
+    if (!isRefreshTokenValid) {
+      await this.removeRefreshTokenFamilyIfCompromised(
+        refreshTokenContent.sub,
+        refreshTokenContent.tokenFamily,
+      );
+
+      throw new InvalidRefreshTokenException();
+    }
+
+    return true;
+  }
+
+  private async removeRefreshTokenFamilyIfCompromised(
+    userId: number,
+    tokenFamily: string,
+  ): Promise<void> {
+    const familyTokens = await this.prismaService.userTokens.findMany({
+      where: { userId, family: tokenFamily },
+    });
+
+    if (familyTokens.length > 0) {
+      await this.prismaService.userTokens.deleteMany({
+        where: { userId, family: tokenFamily },
+      });
+    }
   }
 
   private async validateUser(
@@ -94,4 +173,16 @@ export class AuthService {
       data: { ...refreshTokenCredentials, expiresAt },
     });
   }
+
+  private async getUserRole(userId: number): Promise<string> {
+    const user = await this.userService.findById(userId);
+
+    if (!user) {
+      throw new HttpException('Пользователь с таким id не найден', 404);
+    }
+
+    return user.role;
+  }
+
+  // TODO: Cделать выходы из системы с помощью family токена, первым дело сдлеать логику куков а потом выхода из системы
 }

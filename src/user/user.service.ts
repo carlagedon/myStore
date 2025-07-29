@@ -29,4 +29,10 @@ export class UserService {
       where: { email },
     });
   }
+
+  async findById(id: number): Promise<User | null> {
+    return await this.prismaService.user.findUnique({
+      where: { id },
+    });
+  }
 }
