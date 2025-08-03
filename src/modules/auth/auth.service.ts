@@ -1,10 +1,10 @@
 import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
+import { User, UserTokens } from '@prisma/client';
 import { compare } from 'bcrypt';
 import { PrismaService } from 'src/config/db/prisma.service';
 
-import { UserService } from 'src/user/user.service';
+import { UserService } from 'src/modules/user/user.service';
 import { LoginDto } from './dto/login.dto';
 import { v4 as uuidV4 } from 'uuid';
 
@@ -150,7 +150,7 @@ export class AuthService {
       payload.tokenFamily = uuidV4();
     }
 
-    const refreshToken = await this.jwtRefresh.signAsync(payload);
+    const refreshToken = await this.jwtRefresh.signAsync({ ...payload });
 
     await this.saveRefreshToken({
       userId: payload.sub,
@@ -184,5 +184,31 @@ export class AuthService {
     return user.role;
   }
 
-  // TODO: Cделать выходы из системы с помощью family токена, первым дело сдлеать логику куков а потом выхода из системы
+  //** Удаление refresh токена, в следсвии чего
+  // с помощью этой сессии нельязя будет
+  // войти ещё раз т.к нет refresh токена
+  //   */
+  async logout(refreshToken: string): Promise<void> {
+    await this.prismaService.userTokens.deleteMany({
+      where: { refreshToken },
+    });
+  }
+
+  //** Удаляем все токены */
+  async logoutAll(userId: number): Promise<void> {
+    await this.prismaService.userTokens.deleteMany({
+      where: { userId },
+    });
+  }
+
+  //** Получаем все токены пользователя */
+  async findAllTokens(userId: number): Promise<UserTokens[]> {
+    const tokens = await this.prismaService.userTokens.findMany({
+      where: { userId },
+    });
+
+    return tokens;
+  }
+
+  // TODO: Сделать гуард для ролей
 }

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthController } from './auth.controller';
-import { UserModule } from 'src/user/user.module';
+import { UserModule } from 'src/modules/user/user.module';
 import { ConfigModule } from '@nestjs/config';
 import {
   ACCESS_JWT_SERVICE,
@@ -9,13 +9,13 @@ import {
 } from 'src/config/jwt.provider.factory';
 import { PrismaModule } from 'src/config/db/prisma.module';
 import { AuthService } from './auth.service';
-
-// константу лучше вынести в отдельный файл, но для простоты оставим здесь
+import { AccessJwtStrategy } from './access.jwt.strategy';
 
 @Module({
   controllers: [AuthController],
   providers: [
     AuthService,
+    AccessJwtStrategy,
     createJwtProvider(
       ACCESS_JWT_SERVICE,
       'JWT_ACCESS_SECRET',
