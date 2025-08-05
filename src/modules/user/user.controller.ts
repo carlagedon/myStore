@@ -17,6 +17,7 @@ import { UpdateRoleDto } from './dto/updateRole.dto';
 import { ApiBearerAuth } from '@nestjs/swagger';
 import { GetCurrentUser } from 'src/common/decorator/getCurrentUser.decorator';
 import { RemoveUserDto } from './dto/removeUser.dto';
+import { UpdateUserDto } from './dto/updateUser.dto';
 
 @Controller('user')
 export class UserController {
@@ -51,11 +52,20 @@ export class UserController {
   }
 
   @ApiBearerAuth()
-  @Delete('')
+  @Delete()
   async removeUser(
     @GetCurrentUser('userId') userId: number,
     @Body() removeUserDto: RemoveUserDto,
   ) {
     await this.userService.removeUser(removeUserDto, userId);
+  }
+
+  @ApiBearerAuth()
+  @Patch()
+  async updateUser(
+    @GetCurrentUser('userId') userId: number,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    return await this.userService.updateUser(userId, updateUserDto);
   }
 }

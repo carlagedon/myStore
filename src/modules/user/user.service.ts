@@ -9,6 +9,7 @@ import { UpdateUserDto } from './dto/updateUser.dto';
 import { UpdateRoleDto } from './dto/updateRole.dto';
 import { RemoveUserDto } from './dto/removeUser.dto';
 
+// осталось сделать обновленеи пользователя имя и т.д
 @Injectable()
 export class UserService {
   constructor(
@@ -22,10 +23,7 @@ export class UserService {
       throw new HttpException('Пользователь с таки email уже существует', 400);
     }
 
-    const hashPasword = await hash(
-      dto.password,
-      this.configService.getOrThrow<number>('CONFIG_HASH_SALT'),
-    );
+    const hashPasword = await hash(dto.password, 10);
 
     return await this.prismaService.user.create({
       data: {
@@ -33,6 +31,29 @@ export class UserService {
         password: hashPasword,
       },
     });
+  }
+
+  async updateUser(
+    id: number,
+    updateUserDto: UpdateUserDto,
+  ): Promise<UserWithoutPasswordDto> {
+    await this.hashIfUpdatingPassword(id, updateUserDto);
+
+    const user = await this.prismaService.user.update({
+      where: { id },
+      data: { ...updateUserDto, updatedAt: new Date() },
+    });
+
+    // Исключить пароль из возвращаемого объекта пользователя
+    // опять же проблема в том тчо я не создал entity и не описал его, потому что prisma возвращает null а ждут undefined
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password, ...userWithoutPassword } = user;
+
+    return {
+      ...userWithoutPassword,
+      name: user.name ?? undefined,
+      address: user.address ?? undefined,
+    };
   }
 
   // Вобще что бы не было проблем с типами надо было создать entity что бы не было посстоянных проблем стипами между ts и prisma
@@ -124,10 +145,7 @@ export class UserService {
     if (updateUserDto.password && updateUserDto.currentPassword) {
       await this.validateCurrrentPassord(id, updateUserDto.currentPassword);
 
-      const hashPassword = await hash(
-        updateUserDto.currentPassword,
-        this.configService.getOrThrow<number>('CONFIG_HASH_SALT'),
-      );
+      const hashPassword = await hash(updateUserDto.currentPassword, 10);
 
       updateUserDto.password = hashPassword;
       delete updateUserDto.currentPassword;
