@@ -181,6 +181,10 @@ export class AuthService {
       throw new HttpException('Пользователь с таким id не найден', 404);
     }
 
+    if (!user.role) {
+      throw new HttpException('Роль пользователя не указана', 400);
+    }
+
     return user.role;
   }
 

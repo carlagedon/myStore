@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
 import {
   IsEmail,
   IsNotEmpty,
@@ -23,7 +24,7 @@ export class CreateUserDto {
   })
   @IsNotEmpty({ message: 'Имя не должен быть пустым' })
   @IsString()
-  name: string;
+  name?: string | undefined;
 
   @ApiProperty({
     description: 'Пароль пользователя',
@@ -43,4 +44,12 @@ export class CreateUserDto {
     example: '123 Main St, Springfield',
   })
   address?: string;
+
+  @IsOptional()
+  @IsString()
+  @ApiProperty({
+    description: 'Роль пользователя',
+    example: Role.ADMIN,
+  })
+  role?: Role;
 }
