@@ -39,6 +39,26 @@ model UserTokens {
   createdAt    DateTime @default(now())
 }
 
+model Product {
+  id Int @id @default(autoincrement())
+  name String @unique
+  urlName String @unique
+  picture String?
+  basePrice Decimal
+  discountPercentage Int        @default(0)
+  stock              Int        @default(0)
+  description        String?
+  createdAt          DateTime   @default(now())
+  categories         Category[]
+
+}
+
+model Category {
+  id       Int    @id @default(autoincrement())
+  name     String    @unique
+  products Product[]
+}
+
 enum Role {
   USER
   ADMIN

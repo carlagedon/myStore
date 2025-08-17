@@ -5,6 +5,8 @@ import { UserModule } from './user/user.module';
 import { AuthModule } from './auth/auth.module';
 import { APP_GUARD } from '@nestjs/core';
 import { AccessJwtGuard } from './auth/access.jwt.guard';
+import { CategoryModule } from './category/category.module';
+import { ProductModule } from './product/product.module';
 
 @Module({
   imports: [
@@ -15,6 +17,8 @@ import { AccessJwtGuard } from './auth/access.jwt.guard';
     }),
     UserModule,
     AuthModule,
+    CategoryModule,
+    ProductModule,
   ],
   providers: [
     {
